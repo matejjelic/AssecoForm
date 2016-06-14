@@ -41,4 +41,13 @@
         android:text="@string/calculate_hash"
         android:textSize="@dimen/textSmall" />
 
+    <ProgressBar
+        android:id="@+id/pbLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
 </RelativeLayout>

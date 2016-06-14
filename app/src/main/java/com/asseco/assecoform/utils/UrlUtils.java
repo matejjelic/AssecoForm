@@ -1,7 +1,9 @@
 package com.asseco.assecoform.utils;
 
 import android.content.Context;
+import android.os.AsyncTask;
 import android.util.Log;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.asseco.assecoform.R;
@@ -11,35 +13,50 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Created by matej on 6/13/16.
  */
-public class UrlUtils {
+public class UrlUtils extends AsyncTask<Void, String, String> {
 
     private static final String LOG_TAG = "UrlUtils";
     private URL url;
     private Context context;
+    private ProgressBar progressBar;
 
-    public UrlUtils(URL url, Context context) {
+    public UrlUtils(URL url, Context context, ProgressBar progressBar) {
         this.url = url;
         this.context = context;
+        this.progressBar = progressBar;
     }
 
     public String getHashedWebsiteContent() {
-        String result = null;
+        StringBuffer result = null;
         String body = getWebsiteContent();
 
-        return result;
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.update(body.getBytes());
+
+            byte byteData[] = md.digest();
+            result = new StringBuffer();
+            for (int i = 0; i < byteData.length; i++) {
+                String hex = Integer.toHexString(0xff & byteData[i]);
+                if (hex.length() == 1) result.append('0');
+                result.append(hex);
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        return result.toString();
     }
 
     /**
+     * Gets website content for a given URL.
      * Source http://stackoverflow.com/questions/5867975/reading-websites-contents-into-string
-     * Errors:
-     * - http://stackoverflow.com/questions/6343166/how-to-fix-android-os-networkonmainthreadexception
-     * Resolutions:
-     * - http://stackoverflow.com/questions/9671546/asynctask-android-example
-     * - http://stackoverflow.com/questions/9671546/asynctask-android-example
      */
     private String getWebsiteContent() {
         String result = null;
@@ -59,7 +76,6 @@ public class UrlUtils {
                 }
 
                 result = new String(baos.toByteArray(), encoding);
-                System.out.println("***** BODY: " + result);
             } else {
                 encounteredError = true;
             }
@@ -73,6 +89,40 @@ public class UrlUtils {
         }
 
         return result;
+    }
+
+    private void storeHash(String hash) {
+        String firstMd5ByteHex = hash.substring(0, 1);
+        int firstMd5ByteInt = Integer.parseInt(firstMd5ByteHex, 16);
+
+        // if the first byte is even - store to DB, if it's odd - store to SharedPrefs
+        if (firstMd5ByteInt % 2 == 0) {
+            Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is stored in Database.", Toast.LENGTH_LONG).show();
+//            storeToDb();
+        } else {
+            Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is stored in SharedPreferences.", Toast.LENGTH_LONG).show();
+//            storeToSharedPrefs();
+        }
+    }
+
+    @Override
+    protected void onPreExecute() {
+        super.onPreExecute();
+        progressBar.setVisibility(ProgressBar.VISIBLE);
+        progressBar.animate();
+    }
+
+    @Override
+    protected void onPostExecute(String s) {
+        super.onPostExecute(s);
+        progressBar.setVisibility(ProgressBar.GONE);
+        storeHash(s);
+    }
+
+    @Override
+    protected String doInBackground(Void... params) {
+        publishProgress("Hashing website content...");
+        return getHashedWebsiteContent();
     }
 
     public URL getUrl() {
@@ -89,6 +139,14 @@ public class UrlUtils {
 
     public void setContext(Context context) {
         this.context = context;
+    }
+
+    public ProgressBar getProgressBar() {
+        return progressBar;
+    }
+
+    public void setProgressBar(ProgressBar progressBar) {
+        this.progressBar = progressBar;
     }
 
 }

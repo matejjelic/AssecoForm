@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.asseco.assecoform.utils.UrlUtils;
@@ -19,6 +20,7 @@ public class FormActivity extends AppCompatActivity implements View.OnClickListe
     private static final String LOG_TAG = "FormActivity";
     private EditText url;
     private Button calculateHash;
+    private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,20 +34,14 @@ public class FormActivity extends AppCompatActivity implements View.OnClickListe
         url = (EditText) findViewById(R.id.etUrl);
         calculateHash = (Button) findViewById(R.id.bttnCalculateHash);
         calculateHash.setOnClickListener(this);
+        progressBar = (ProgressBar) findViewById(R.id.pbLoading);
     }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.bttnCalculateHash:
-                Editable urlText = url.getText();
-                if (urlText != null && !url.getText().toString().isEmpty()) {
-                    URL u = getUrlFromString(url.getText().toString());
-                    UrlUtils utils = new UrlUtils(u, this);
-                    String hash = utils.getHashedWebsiteContent();
-                } else {
-                    Toast.makeText(this, R.string.urlIsEmpty, Toast.LENGTH_SHORT).show();
-                }
+                fetchAndStoreHashedContent();
                 break;
 
             default:
@@ -63,6 +59,17 @@ public class FormActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         return result;
+    }
+
+    private void fetchAndStoreHashedContent() {
+        Editable urlText = url.getText();
+        if (urlText != null && !url.getText().toString().isEmpty()) {
+            URL u = getUrlFromString(url.getText().toString());
+            UrlUtils utils = new UrlUtils(u, this, progressBar);
+            utils.execute();
+        } else {
+            Toast.makeText(this, R.string.urlIsEmpty, Toast.LENGTH_SHORT).show();
+        }
     }
 
 

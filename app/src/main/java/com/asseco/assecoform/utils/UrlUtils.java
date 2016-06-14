@@ -7,6 +7,8 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.asseco.assecoform.R;
+import com.asseco.assecoform.model.WebContentHash;
+import com.asseco.assecoform.model.WebContentHashDataSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,11 +27,13 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
     private URL url;
     private Context context;
     private ProgressBar progressBar;
+    private boolean urlAlreadyStored;
 
     public UrlUtils(URL url, Context context, ProgressBar progressBar) {
         this.url = url;
         this.context = context;
         this.progressBar = progressBar;
+        this.urlAlreadyStored = false;
     }
 
     public String getHashedWebsiteContent() {
@@ -85,6 +89,7 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         }
 
         if (encounteredError) {
+            cancel(true);
             Toast.makeText(context, R.string.errorHashingUrl, Toast.LENGTH_SHORT).show();
         }
 
@@ -97,19 +102,45 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
 
         // if the first byte is even - store to DB, if it's odd - store to SharedPrefs
         if (firstMd5ByteInt % 2 == 0) {
-            Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is stored in Database.", Toast.LENGTH_LONG).show();
-//            storeToDb();
+            storeToDatabase(hash);
         } else {
             Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is stored in SharedPreferences.", Toast.LENGTH_LONG).show();
 //            storeToSharedPrefs();
         }
     }
 
+    private void storeToDatabase(String md5) {
+        WebContentHashDataSource ds = new WebContentHashDataSource(context);
+
+        WebContentHash contentHash = new WebContentHash(url.toString(), md5);
+        ds.insertWebContentHash(contentHash);
+        System.out.println("***** Stored in DB: [" + url.toString() + ", " + md5 + "]");
+        Toast.makeText(context, "Hash " + md5 + " for URL " + url.toString() + " is stored in Database.", Toast.LENGTH_LONG).show();
+    }
+
+    private boolean urlExistsInStorage() {
+        boolean result;
+        WebContentHashDataSource ds = new WebContentHashDataSource(context);
+        String hash = ds.getHashForUrl(url.toString());
+
+        if (hash != null && !hash.isEmpty()) {
+            result = true;
+            Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is already stored in Database.", Toast.LENGTH_LONG).show();
+        } else {
+            result = false;
+        }
+
+        return result;
+    }
+
     @Override
     protected void onPreExecute() {
         super.onPreExecute();
-        progressBar.setVisibility(ProgressBar.VISIBLE);
-        progressBar.animate();
+        urlAlreadyStored = urlExistsInStorage();
+        if (!urlAlreadyStored) {
+            progressBar.setVisibility(ProgressBar.VISIBLE);
+            progressBar.animate();
+        }
     }
 
     @Override
@@ -121,8 +152,15 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
 
     @Override
     protected String doInBackground(Void... params) {
-        publishProgress("Hashing website content...");
-        return getHashedWebsiteContent();
+        String result = "";
+        if (urlAlreadyStored) {
+            cancel(true);
+        } else {
+            publishProgress("Hashing website content...");
+            result = getHashedWebsiteContent();
+        }
+
+        return result;
     }
 
     public URL getUrl() {
@@ -149,4 +187,11 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         this.progressBar = progressBar;
     }
 
+    public boolean isUrlAlreadyStored() {
+        return urlAlreadyStored;
+    }
+
+    public void setUrlAlreadyStored(boolean urlAlreadyStored) {
+        this.urlAlreadyStored = urlAlreadyStored;
+    }
 }

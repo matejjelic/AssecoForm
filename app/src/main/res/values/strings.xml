@@ -4,4 +4,5 @@
     <string name="calculate_hash">Calculate hash</string>
     <string name="urlIsEmpty">The URL is empty</string>
     <string name="errorHashingUrl">Error while making a hash from URL content</string>
+    <string name="invalidUrl">Invalid URL</string>
 </resources>

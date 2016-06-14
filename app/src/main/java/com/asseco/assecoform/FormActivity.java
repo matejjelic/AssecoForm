@@ -12,6 +12,8 @@ import android.widget.Toast;
 
 import com.asseco.assecoform.utils.UrlUtils;
 
+import org.apache.commons.validator.routines.UrlValidator;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -64,13 +66,23 @@ public class FormActivity extends AppCompatActivity implements View.OnClickListe
     private void fetchAndStoreHashedContent() {
         Editable urlText = url.getText();
         if (urlText != null && !url.getText().toString().isEmpty()) {
-            URL u = getUrlFromString(url.getText().toString());
-            UrlUtils utils = new UrlUtils(u, this, progressBar);
-            utils.execute();
+            String urlString = url.getText().toString();
+            boolean isUrlValid = validateURL(urlString);
+            if (isUrlValid) {
+                URL u = getUrlFromString(urlString);
+                UrlUtils utils = new UrlUtils(u, this, progressBar);
+                utils.execute();
+            } else {
+                Toast.makeText(this, R.string.invalidUrl, Toast.LENGTH_SHORT).show();
+            }
         } else {
             Toast.makeText(this, R.string.urlIsEmpty, Toast.LENGTH_SHORT).show();
         }
     }
 
+    private boolean validateURL(String url) {
+        UrlValidator urlValidator = new UrlValidator();
+        return urlValidator.isValid(url);
+    }
 
 }

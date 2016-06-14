@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AssecoForm</string>
+    <string name="app_name">Asseco Form</string>
     <string name="web_address_url">Web address URL</string>
     <string name="calculate_hash">Calculate hash</string>
     <string name="urlIsEmpty">The URL is empty</string>

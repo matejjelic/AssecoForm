@@ -1,12 +1,15 @@
-package com.asseco.assecoform.utils;
+package com.asseco.assecoform.controller;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
-import android.util.Log;
+import android.preference.PreferenceManager;
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.asseco.assecoform.R;
+import com.asseco.assecoform.controller.timer.ButtonTimer;
 import com.asseco.assecoform.model.WebContentHash;
 import com.asseco.assecoform.model.WebContentHashDataSource;
 
@@ -17,45 +20,59 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Timer;
 
 /**
  * Created by matej on 6/13/16.
  */
-public class UrlUtils extends AsyncTask<Void, String, String> {
+public class UrlController extends AsyncTask<Void, String, String> {
 
-    private static final String LOG_TAG = "UrlUtils";
+    private static final String LOG_TAG = "UrlController";
+    boolean encounteredError;
     private URL url;
     private Context context;
     private ProgressBar progressBar;
+    private Button button;
     private boolean urlAlreadyStored;
+    private SharedPreferences sharedPreferences;
 
-    public UrlUtils(URL url, Context context, ProgressBar progressBar) {
+    public UrlController(URL url, Context context, ProgressBar progressBar, Button button) {
         this.url = url;
         this.context = context;
         this.progressBar = progressBar;
         this.urlAlreadyStored = false;
+        this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        this.button = button;
+        this.encounteredError = false;
     }
 
     public String getHashedWebsiteContent() {
         StringBuffer result = null;
         String body = getWebsiteContent();
 
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.update(body.getBytes());
+        if (body != null) {
+            try {
+                MessageDigest md = MessageDigest.getInstance("MD5");
+                md.update(body.getBytes());
 
-            byte byteData[] = md.digest();
-            result = new StringBuffer();
-            for (int i = 0; i < byteData.length; i++) {
-                String hex = Integer.toHexString(0xff & byteData[i]);
-                if (hex.length() == 1) result.append('0');
-                result.append(hex);
+                byte byteData[] = md.digest();
+                result = new StringBuffer();
+                for (int i = 0; i < byteData.length; i++) {
+                    String hex = Integer.toHexString(0xff & byteData[i]);
+                    if (hex.length() == 1) result.append('0');
+                    result.append(hex);
+                }
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
             }
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
         }
 
-        return result.toString();
+        if (result != null) {
+            return result.toString();
+        } else {
+            return null;
+        }
+
     }
 
     /**
@@ -64,7 +81,6 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
      */
     private String getWebsiteContent() {
         String result = null;
-        boolean encounteredError = false;
 
         try {
             if (url != null) {
@@ -85,12 +101,11 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
             }
         } catch (IOException e) {
             encounteredError = true;
-            Log.d(LOG_TAG, e.getMessage(), e);
+//            Log.d(LOG_TAG, e.getMessage(), e);
         }
 
         if (encounteredError) {
             cancel(true);
-            Toast.makeText(context, R.string.errorHashingUrl, Toast.LENGTH_SHORT).show();
         }
 
         return result;
@@ -104,21 +119,37 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         if (firstMd5ByteInt % 2 == 0) {
             storeToDatabase(hash);
         } else {
-            Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is stored in SharedPreferences.", Toast.LENGTH_LONG).show();
-//            storeToSharedPrefs();
+            storeToSharedPreferences(hash);
         }
     }
 
     private void storeToDatabase(String md5) {
         WebContentHashDataSource ds = new WebContentHashDataSource(context);
-
         WebContentHash contentHash = new WebContentHash(url.toString(), md5);
         ds.insertWebContentHash(contentHash);
-        System.out.println("***** Stored in DB: [" + url.toString() + ", " + md5 + "]");
+
         Toast.makeText(context, "Hash " + md5 + " for URL " + url.toString() + " is stored in Database.", Toast.LENGTH_LONG).show();
     }
 
+    private void storeToSharedPreferences(String md5) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(url.toString(), md5);
+        editor.commit();
+
+        Toast.makeText(context, "Hash " + md5 + " for URL " + url.toString() + " is stored in SharedPreferences.", Toast.LENGTH_LONG).show();
+    }
+
     private boolean urlExistsInStorage() {
+        boolean result;
+
+        if (urlExistsInDatabase()) {
+            result = true;
+        } else result = urlExistsiInSharedPreferences();
+
+        return result;
+    }
+
+    private boolean urlExistsInDatabase() {
         boolean result;
         WebContentHashDataSource ds = new WebContentHashDataSource(context);
         String hash = ds.getHashForUrl(url.toString());
@@ -133,6 +164,32 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         return result;
     }
 
+    private boolean urlExistsiInSharedPreferences() {
+        boolean result;
+        if (sharedPreferences != null) {
+            String hash = sharedPreferences.getString(url.toString(), "");
+            if (!hash.isEmpty()) {
+                result = true;
+                Toast.makeText(context, "Hash " + hash + " for URL " + url.toString() + " is already stored in SharedPreferences.", Toast.LENGTH_LONG).show();
+            } else {
+                result = false;
+            }
+        } else {
+            result = false;
+        }
+        return result;
+    }
+
+    @Override
+    protected void onCancelled() {
+        super.onCancelled();
+        progressBar.setVisibility(ProgressBar.GONE);
+        if (encounteredError) {
+            Toast.makeText(context, R.string.errorHashingUrl, Toast.LENGTH_SHORT).show();
+        }
+        button.setClickable(true);
+    }
+
     @Override
     protected void onPreExecute() {
         super.onPreExecute();
@@ -140,6 +197,9 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         if (!urlAlreadyStored) {
             progressBar.setVisibility(ProgressBar.VISIBLE);
             progressBar.animate();
+            button.setClickable(false);
+        } else {
+            disableButtonForFiveSeconds();
         }
     }
 
@@ -147,6 +207,10 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
     protected void onPostExecute(String s) {
         super.onPostExecute(s);
         progressBar.setVisibility(ProgressBar.GONE);
+        button.setClickable(true);
+        if (encounteredError) {
+            progressBar.setVisibility(ProgressBar.GONE);
+        }
         storeHash(s);
     }
 
@@ -158,40 +222,17 @@ public class UrlUtils extends AsyncTask<Void, String, String> {
         } else {
             publishProgress("Hashing website content...");
             result = getHashedWebsiteContent();
+            if (result == null || result.isEmpty()) {
+                cancel(true);
+            }
         }
 
         return result;
     }
 
-    public URL getUrl() {
-        return url;
+    private void disableButtonForFiveSeconds() {
+        Timer timer = new Timer();
+        timer.schedule(new ButtonTimer(button), 0, 1000);
     }
 
-    public void setUrl(URL url) {
-        this.url = url;
-    }
-
-    public Context getContext() {
-        return context;
-    }
-
-    public void setContext(Context context) {
-        this.context = context;
-    }
-
-    public ProgressBar getProgressBar() {
-        return progressBar;
-    }
-
-    public void setProgressBar(ProgressBar progressBar) {
-        this.progressBar = progressBar;
-    }
-
-    public boolean isUrlAlreadyStored() {
-        return urlAlreadyStored;
-    }
-
-    public void setUrlAlreadyStored(boolean urlAlreadyStored) {
-        this.urlAlreadyStored = urlAlreadyStored;
-    }
 }

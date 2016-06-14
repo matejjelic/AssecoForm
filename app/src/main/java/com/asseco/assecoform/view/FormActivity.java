@@ -1,4 +1,4 @@
-package com.asseco.assecoform;
+package com.asseco.assecoform.view;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -10,7 +10,8 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import com.asseco.assecoform.utils.UrlUtils;
+import com.asseco.assecoform.R;
+import com.asseco.assecoform.controller.UrlController;
 
 import org.apache.commons.validator.routines.UrlValidator;
 
@@ -67,17 +68,27 @@ public class FormActivity extends AppCompatActivity implements View.OnClickListe
         Editable urlText = url.getText();
         if (urlText != null && !url.getText().toString().isEmpty()) {
             String urlString = url.getText().toString();
+            urlString = correctUrl(urlString);
             boolean isUrlValid = validateURL(urlString);
             if (isUrlValid) {
                 URL u = getUrlFromString(urlString);
-                UrlUtils utils = new UrlUtils(u, this, progressBar);
-                utils.execute();
+                UrlController controller = new UrlController(u, this, progressBar, calculateHash);
+                controller.execute();
             } else {
                 Toast.makeText(this, R.string.invalidUrl, Toast.LENGTH_SHORT).show();
             }
         } else {
             Toast.makeText(this, R.string.urlIsEmpty, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private String correctUrl(String url) {
+        String result = url;
+        if (!url.contains("http://") && !url.contains("https://")) {
+            result = "http://" + url;
+        }
+
+        return result;
     }
 
     private boolean validateURL(String url) {
